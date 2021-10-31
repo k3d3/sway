@@ -115,7 +115,7 @@ enum wlr_edges find_resize_edge(struct sway_container *cont,
 static struct sway_binding* get_active_mouse_binding(
 		struct seatop_default_event *e, list_t *bindings, uint32_t modifiers,
 		bool release, bool on_titlebar, bool on_border, bool on_content,
-		bool on_workspace, const char *identifier) {
+		bool on_workspace, const char *identifier, uint32_t changed_button) {
 	uint32_t click_region =
 			((on_titlebar || on_workspace) ? BINDING_TITLEBAR : 0) |
 			((on_border || on_workspace) ? BINDING_BORDER : 0) |
@@ -130,8 +130,12 @@ static struct sway_binding* get_active_mouse_binding(
 						(modifiers & binding->modifiers) != binding->modifiers :
 						modifiers ^ binding->modifiers;
 
+		bool deny_button_count = binding_mask_modifiers ?
+						false :
+						e->pressed_button_count != (size_t)binding->keys->length;
+
 		if (deny_modifiers ||
-				e->pressed_button_count != (size_t)binding->keys->length ||
+				deny_button_count ||
 				release != (binding->flags & BINDING_RELEASE) ||
 				!(click_region & binding->flags) ||
 				(on_workspace &&
@@ -142,11 +146,28 @@ static struct sway_binding* get_active_mouse_binding(
 		}
 
 		bool match = true;
-		for (size_t j = 0; j < e->pressed_button_count; j++) {
-			uint32_t key = *(uint32_t *)binding->keys->items[j];
-			if (key != e->pressed_buttons[j]) {
+		if (binding_mask_modifiers) {
+			size_t matching_keys = 0;
+			bool matched_changed_button = false;
+			for (size_t j = 0, k = 0; j < e->pressed_button_count; j++) {
+				uint32_t key = *(uint32_t *)binding->keys->items[k];
+				if (key == changed_button) {
+					matched_changed_button = true;
+				}
+				if (key == e->pressed_buttons[j]) {
+					matching_keys++;
+				}
+			}
+			if (!matched_changed_button || matching_keys != (size_t) binding->keys->length) {
 				match = false;
-				break;
+			}
+		} else {
+			for (size_t j = 0; j < e->pressed_button_count; j++) {
+				uint32_t key = *(uint32_t *)binding->keys->items[j];
+				if (key != e->pressed_buttons[j]) {
+					match = false;
+					break;
+				}
 			}
 		}
 		if (!match) {
@@ -310,12 +331,12 @@ static bool trigger_pointer_button_binding(struct sway_seat *seat,
 		binding = get_active_mouse_binding(e,
 			config->current_mode->mouse_bindings, modifiers, false,
 			on_titlebar, on_border, on_contents, on_workspace,
-			device_identifier);
+			device_identifier, button);
 	} else {
 		binding = get_active_mouse_binding(e,
 			config->current_mode->mouse_bindings, modifiers, true,
 			on_titlebar, on_border, on_contents, on_workspace,
-			device_identifier);
+			device_identifier, button);
 		state_erase_button(e, button);
 	}
 
@@ -492,7 +513,9 @@ static void handle_button(struct sway_seat *seat, uint32_t time_msec,
 	// Handle mousedown on a container surface
 	if (surface && cont && state == WLR_BUTTON_PRESSED) {
 		seat_set_focus_container(seat, cont);
-		seatop_begin_down(seat, cont, time_msec, sx, sy);
+		//seatop_begin_down(seat, cont, time_msec, sx, sy);
+		// Use default handler instead of down handler
+		// I'm not sure why this makes cursor button handling work
 		seat_pointer_notify_button(seat, time_msec, button, WLR_BUTTON_PRESSED);
 		return;
 	}
@@ -704,7 +727,7 @@ static void handle_pointer_axis(struct sway_seat *seat,
 	state_add_button(e, button);
 	binding = get_active_mouse_binding(e, config->current_mode->mouse_bindings,
 			modifiers, false, on_titlebar, on_border, on_contents, on_workspace,
-			dev_id);
+			dev_id, button);
 	if (binding) {
 		seat_execute_command(seat, binding);
 		handled = true;
@@ -741,7 +764,7 @@ static void handle_pointer_axis(struct sway_seat *seat,
 	// Handle mouse bindings - x11 mouse buttons 4-7 - release event
 	binding = get_active_mouse_binding(e, config->current_mode->mouse_bindings,
 			modifiers, true, on_titlebar, on_border, on_contents, on_workspace,
-			dev_id);
+			dev_id, button);
 	state_erase_button(e, button);
 	if (binding) {
 		seat_execute_command(seat, binding);
