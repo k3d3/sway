@@ -158,8 +158,13 @@ static void get_active_binding(const struct sway_shortcut_state *state,
 		bool binding_locked = (binding->flags & BINDING_LOCKED) != 0;
 		bool binding_inhibited = (binding->flags & BINDING_INHIBITED) != 0;
 		bool binding_release = binding->flags & BINDING_RELEASE;
+		bool binding_mask_modifiers = binding->flags & BINDING_MASK_MODIFIERS;
 
-		if (modifiers ^ binding->modifiers ||
+		bool deny_modifiers = binding_mask_modifiers ?
+						(modifiers & binding->modifiers) != binding->modifiers :
+						modifiers ^ binding->modifiers;
+
+		if (deny_modifiers ||
 				release != binding_release ||
 				locked > binding_locked ||
 				inhibited > binding_inhibited ||

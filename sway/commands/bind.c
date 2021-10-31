@@ -376,6 +376,8 @@ static struct cmd_results *cmd_bindsym_or_bindcode(int argc, char **argv,
 			warn = false;
 		} else if (strcmp("--no-repeat", argv[0]) == 0) {
 			binding->flags |= BINDING_NOREPEAT;
+		} else if (strcmp("--mask-modifiers", argv[0]) == 0) {
+			binding->flags |= BINDING_MASK_MODIFIERS;
 		} else {
 			break;
 		}

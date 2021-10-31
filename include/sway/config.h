@@ -45,6 +45,7 @@ enum binding_flags {
 	BINDING_RELOAD = 1 << 6, // switch only; (re)trigger binding on reload
 	BINDING_INHIBITED = 1 << 7, // keyboard only: ignore shortcut inhibitor
 	BINDING_NOREPEAT = 1 << 8, // keyboard only; do not trigger when repeating a held key
+	BINDING_MASK_MODIFIERS = 1 << 9, // keyboard and mouse; only check modifiers defined in a binding
 };
 
 /**

@@ -124,7 +124,13 @@ static struct sway_binding* get_active_mouse_binding(
 	struct sway_binding *current = NULL;
 	for (int i = 0; i < bindings->length; ++i) {
 		struct sway_binding *binding = bindings->items[i];
-		if (modifiers ^ binding->modifiers ||
+		bool binding_mask_modifiers = binding->flags & BINDING_MASK_MODIFIERS;
+
+		bool deny_modifiers = binding_mask_modifiers ?
+						(modifiers & binding->modifiers) != binding->modifiers :
+						modifiers ^ binding->modifiers;
+
+		if (deny_modifiers ||
 				e->pressed_button_count != (size_t)binding->keys->length ||
 				release != (binding->flags & BINDING_RELEASE) ||
 				!(click_region & binding->flags) ||
